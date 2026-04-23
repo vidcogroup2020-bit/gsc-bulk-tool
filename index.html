@@ -261,8 +261,8 @@
     <div class="card">
         <h3 style="margin-top:0">Bước 2: Nhập danh sách Website</h3>
         <div class="form-group">
-            <label>Mỗi dòng 1 tên miền (Bắt buộc phải có https:// hoặc http:// ở đầu)</label>
-            <textarea id="domainList" placeholder="https://domain1.com/&#10;https://domain2.com/&#10;https://sub.domain3.net/"></textarea>
+            <label>Nhập theo mẫu: <b>Tên miền [khoảng trắng] wp-admin [khoảng trắng] user [khoảng trắng] pass</b> (Hoặc chỉ nhập mỗi Tên miền)</label>
+            <textarea id="domainList" placeholder="https://domain1.com/&#9;wp-admin&#9;admin&#9;$lMP43WsE7&#10;https://domain2.com/&#9;wp-admin&#9;hieu&#9;Pass123&#10;https://sub.domain3.net/"></textarea>
             <small style="color:var(--warning); display:block; margin-top:5px;">* Tool tự động xử lý gạch chéo (/) cuối đuôi url để đáp ứng đúng chuẩn yêu cầu của API Google.</small>
         </div>
         <button id="btnStart" class="btn btn-success" onclick="startProcess()" disabled>🚀 Bắt đầu Add & Lấy Mã HTML</button>
@@ -367,22 +367,41 @@
         if (isRunning) return;
 
         let rawUrls = document.getElementById('domainList').value.split('\n');
-        let domains = [];
+        let domainsData = [];
         
         // Tiền xử lý danh sách domain
-        for (let url of rawUrls) {
-            url = url.trim();
-            if (!url) continue;
+        for (let line of rawUrls) {
+            line = line.trim();
+            if (!line) continue;
+            
+            // Phân tách bằng dấu tab hoặc khoảng trắng dài
+            let parts = line.split(/\s+/);
+            let url = parts[0];
+            
             // Đảm bảo có dấu '/' ở cuối theo chuẩn của Google API
             if (!url.endsWith('/')) url += '/';
             // Đảm bảo có giao thức
             if (!url.startsWith('http://') && !url.startsWith('https://')) {
                 url = 'https://' + url;
             }
-            domains.push(url);
+            
+            let user = 'admin';
+            let pass = 'mat_khau_cua_sep';
+            
+            // Theo mẫu sếp đưa: domain wp-admin user pass
+            if (parts.length >= 4) {
+                user = parts[2];
+                pass = parts.slice(3).join(' '); // Gộp lại nếu pass chứa dấu cách
+            } else if (parts.length === 3) {
+                // Nếu sếp nhập thiếu wp-admin: domain user pass
+                user = parts[1];
+                pass = parts[2];
+            }
+            
+            domainsData.push({ url, user, pass });
         }
 
-        if (domains.length === 0) {
+        if (domainsData.length === 0) {
             alert("Vui lòng nhập ít nhất 1 tên miền hợp lệ!");
             return;
         }
@@ -402,11 +421,13 @@
         tbody.innerHTML = ''; // Clear bảng cũ
 
         // Render các dòng chờ xử lý
-        domains.forEach((domain, idx) => {
+        domainsData.forEach((item, idx) => {
             const tr = document.createElement('tr');
             tr.id = `row_${idx}`;
+            tr.dataset.user = item.user;
+            tr.dataset.pass = item.pass;
             tr.innerHTML = `
-                <td class="domain-cell"><a href="${domain}" target="_blank" style="color:var(--primary);text-decoration:none">${domain}</a></td>
+                <td class="domain-cell"><a href="${item.url}" target="_blank" style="color:var(--primary);text-decoration:none">${item.url}</a></td>
                 <td id="status_${idx}"><span class="status-badge status-pending">Đang chờ</span></td>
                 <td id="meta_${idx}" style="color:var(--text-muted)">...</td>
             `;
@@ -414,8 +435,8 @@
         });
 
         // Xử lý từng domain
-        for (let i = 0; i < domains.length; i++) {
-            const siteUrl = domains[i];
+        for (let i = 0; i < domainsData.length; i++) {
+            const siteUrl = domainsData[i].url;
             
             // Cập nhật trạng thái đang chạy
             document.getElementById(`status_${i}`).innerHTML = `<span class="status-badge status-running">Đang Add...</span>`;
@@ -491,7 +512,7 @@
             }
 
             // Cập nhật thanh tiến trình
-            progressFill.style.width = `${((i + 1) / domains.length) * 100}%`;
+            progressFill.style.width = `${((i + 1) / domainsData.length) * 100}%`;
             
             // Dừng 2s để chống Spam API (Tránh lỗi 429)
             await new Promise(r => setTimeout(r, 2000));
@@ -519,7 +540,12 @@
                 let metaText = metaTagSpan.getAttribute('title') || metaTagSpan.innerText;
                 // Phục hồi lại ký tự HTML
                 metaText = metaText.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&apos;/g, "'").replace(/&quot;/g, '"');
-                csvText += `${domain},admin,mat_khau_cua_sep,${metaText}\n`;
+                
+                const user = row.dataset.user || 'admin';
+                const pass = row.dataset.pass || 'mat_khau_cua_sep';
+                const safePass = pass.includes(',') ? `"${pass}"` : pass;
+
+                csvText += `${domain},${user},${safePass},${metaText}\n`;
                 count++;
             }
         });
