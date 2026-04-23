@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GSC Bulk Add & Verify Pro</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --success: #10b981;
+            --danger: #ef4444;
+            --border: #334155;
+            --warning: #f59e0b;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1000px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        .header h1 {
+            margin: 0 0 10px 0;
+            color: var(--primary);
+            font-size: 28px;
+        }
+
+        .header p {
+            margin: 0;
+            color: var(--text-muted);
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text-muted);
+        }
+
+        input[type="text"], textarea {
+            width: 100%;
+            padding: 12px;
+            background-color: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text);
+            font-size: 14px;
+            box-sizing: border-box;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input[type="text"]:focus, textarea:focus {
+            border-color: var(--primary);
+        }
+
+        textarea {
+            height: 150px;
+            resize: vertical;
+            line-height: 1.5;
+            font-family: monospace;
+        }
+
+        .btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .btn:disabled {
+            background-color: var(--border);
+            color: var(--text-muted);
+            cursor: not-allowed;
+        }
+
+        .btn-success {
+            background-color: var(--success);
+        }
+        
+        .btn-success:hover {
+            background-color: #059669;
+        }
+
+        .btn-danger {
+            background-color: var(--danger);
+        }
+
+        .btn-danger:hover {
+            background-color: #dc2626;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid var(--success);
+            padding: 10px 15px;
+            border-radius: 8px;
+            color: var(--success);
+            font-weight: bold;
+            margin-top: 15px;
+            display: none; /* Ẩn mặc định */
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background-color: rgba(255, 255, 255, 0.05);
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        td {
+            font-size: 14px;
+        }
+
+        .domain-cell {
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-pending { background-color: var(--border); color: var(--text-muted); }
+        .status-running { background-color: var(--warning); color: #fff; }
+        .status-success { background-color: var(--success); color: #fff; }
+        .status-error { background-color: var(--danger); color: #fff; }
+
+        .code-box {
+            background: #000;
+            padding: 8px 10px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 12px;
+            color: #a78bfa;
+            border: 1px solid #4c1d95;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-copy {
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+        }
+
+        .btn-copy:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .progress-bar {
+            height: 6px;
+            background-color: var(--border);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background-color: var(--primary);
+            width: 0%;
+            transition: width 0.3s;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>GSC Bulk Add & Meta Verify Pro</h1>
+        <p>Thêm hàng loạt Website vào Google Search Console & Tự động lấy mã HTML xác minh (Flatsome/RankMath)</p>
+    </div>
+
+    <!-- Bước 1: Đăng nhập -->
+    <div class="card">
+        <h3 style="margin-top:0">Bước 1: Kết nối Google Account</h3>
+        <p style="color:var(--text-muted); font-size:14px; margin-top:0;">* Nút đăng nhập đã được cấu hình ẩn mã Google Client ID an toàn ở bên dưới lõi hệ thống.</p>
+        <button id="btnAuth" class="btn" onclick="handleAuthClick()">🔑 Đăng nhập tài khoản Google</button>
+        <button id="btnRevoke" class="btn btn-danger" onclick="handleSignoutClick()" style="display:none;">Thoát tài khoản</button>
+        
+        <div id="userInfo" class="user-info">
+            ✅ Đã cấp quyền thành công! Đã sẵn sàng chạy API.
+        </div>
+    </div>
+
+    <!-- Bước 2: Nhập dữ liệu -->
+    <div class="card">
+        <h3 style="margin-top:0">Bước 2: Nhập danh sách Website</h3>
+        <div class="form-group">
+            <label>Mỗi dòng 1 tên miền (Bắt buộc phải có https:// hoặc http:// ở đầu)</label>
+            <textarea id="domainList" placeholder="https://domain1.com/&#10;https://domain2.com/&#10;https://sub.domain3.net/"></textarea>
+            <small style="color:var(--warning); display:block; margin-top:5px;">* Tool tự động xử lý gạch chéo (/) cuối đuôi url để đáp ứng đúng chuẩn yêu cầu của API Google.</small>
+        </div>
+        <button id="btnStart" class="btn btn-success" onclick="startProcess()" disabled>🚀 Bắt đầu Add & Lấy Mã HTML</button>
+        
+        <div id="progressBar" class="progress-bar">
+            <div id="progressFill" class="progress-fill"></div>
+        </div>
+    </div>
+
+    <!-- Kết quả -->
+    <div class="card">
+        <h3 style="margin-top:0">Bảng Kết Quả & Mã HTML</h3>
+        <div style="overflow-x: auto;">
+            <table>
+                <thead>
+                    <tr>
+                        <th width="30%">Website URL</th>
+                        <th width="15%">Trạng thái Add GSC</th>
+                        <th width="55%">Mã xác minh HTML (Dán vào Flatsome/RankMath)</th>
+                    </tr>
+                </thead>
+                <tbody id="resultBody">
+                    <tr>
+                        <td colspan="3" style="text-align:center; color:var(--text-muted); padding:30px;">
+                            Chưa có dữ liệu. Hãy đăng nhập và bấm chạy.
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script>
+    // ==========================================
+    // CẤU HÌNH HỆ THỐNG
+    // Sếp dán mã Client ID lấy được từ Google Cloud vào đây:
+    const GOOGLE_CLIENT_ID = "YÊU_CẦU_SẾP_ĐIỀN_CLIENT_ID_VÀO_ĐÂY";
+    // ==========================================
+
+    let tokenClient;
+    let accessToken = null;
+    let isRunning = false;
+
+    // 1. Google OAuth Logic
+    function handleAuthClick() {
+        if (GOOGLE_CLIENT_ID === "YÊU_CẦU_SẾP_ĐIỀN_CLIENT_ID_VÀO_ĐÂY" || !GOOGLE_CLIENT_ID) {
+            alert("❌ HỆ THỐNG CHƯA ĐƯỢC CẤU HÌNH!\n\nSếp vui lòng:\n1. Mở file index.html này bằng Notepad (hoặc VSCode).\n2. Tìm đến dòng số 308.\n3. Thay thế dòng chữ 'YÊU_CẦU_SẾP_ĐIỀN_CLIENT_ID_VÀO_ĐÂY' bằng mã Client ID sếp vừa tạo trên Google Cloud.\n4. Lưu lại và F5 trang này.");
+            return;
+        }
+
+        try {
+            tokenClient = google.accounts.oauth2.initTokenClient({
+                client_id: GOOGLE_CLIENT_ID,
+                scope: 'https://www.googleapis.com/auth/webmasters https://www.googleapis.com/auth/siteverification',
+                callback: (tokenResponse) => {
+                    if (tokenResponse && tokenResponse.access_token) {
+                        accessToken = tokenResponse.access_token;
+                        document.getElementById('btnAuth').style.display = 'none';
+                        document.getElementById('btnRevoke').style.display = 'inline-flex';
+                        document.getElementById('userInfo').style.display = 'flex';
+                        document.getElementById('btnStart').disabled = false;
+                    }
+                },
+            });
+            tokenClient.requestAccessToken({prompt: 'consent'});
+        } catch (error) {
+            alert("Lỗi khởi tạo Google OAuth. Vui lòng kiểm tra lại Client ID.");
+            console.error(error);
+        }
+    }
+
+    function handleSignoutClick() {
+        if (accessToken) {
+            google.accounts.oauth2.revoke(accessToken, () => {
+                accessToken = null;
+                document.getElementById('btnAuth').style.display = 'inline-flex';
+                document.getElementById('btnRevoke').style.display = 'none';
+                document.getElementById('userInfo').style.display = 'none';
+                document.getElementById('btnStart').disabled = true;
+            });
+        }
+    }
+
+    // 2. Logic xử lý API GSC
+    async function startProcess() {
+        if (!accessToken) {
+            alert("Chưa đăng nhập! Vui lòng đăng nhập Google trước.");
+            return;
+        }
+        if (isRunning) return;
+
+        let rawUrls = document.getElementById('domainList').value.split('\n');
+        let domains = [];
+        
+        // Tiền xử lý danh sách domain
+        for (let url of rawUrls) {
+            url = url.trim();
+            if (!url) continue;
+            // Đảm bảo có dấu '/' ở cuối theo chuẩn của Google API
+            if (!url.endsWith('/')) url += '/';
+            // Đảm bảo có giao thức
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                url = 'https://' + url;
+            }
+            domains.push(url);
+        }
+
+        if (domains.length === 0) {
+            alert("Vui lòng nhập ít nhất 1 tên miền hợp lệ!");
+            return;
+        }
+
+        // Setup UI
+        isRunning = true;
+        const btnStart = document.getElementById('btnStart');
+        btnStart.innerHTML = `<span style="display:inline-block; animation: spin 1s linear infinite;">⏳</span> Đang xử lý...`;
+        btnStart.disabled = true;
+        
+        const progressBar = document.getElementById('progressBar');
+        const progressFill = document.getElementById('progressFill');
+        progressBar.style.display = 'block';
+        progressFill.style.width = '0%';
+
+        const tbody = document.getElementById('resultBody');
+        tbody.innerHTML = ''; // Clear bảng cũ
+
+        // Render các dòng chờ xử lý
+        domains.forEach((domain, idx) => {
+            const tr = document.createElement('tr');
+            tr.id = `row_${idx}`;
+            tr.innerHTML = `
+                <td class="domain-cell"><a href="${domain}" target="_blank" style="color:var(--primary);text-decoration:none">${domain}</a></td>
+                <td id="status_${idx}"><span class="status-badge status-pending">Đang chờ</span></td>
+                <td id="meta_${idx}" style="color:var(--text-muted)">...</td>
+            `;
+            tbody.appendChild(tr);
+        });
+
+        // Xử lý từng domain
+        for (let i = 0; i < domains.length; i++) {
+            const siteUrl = domains[i];
+            
+            // Cập nhật trạng thái đang chạy
+            document.getElementById(`status_${i}`).innerHTML = `<span class="status-badge status-running">Đang Add...</span>`;
+            
+            // 1. GỌI API THÊM VÀO GSC (Sites.add)
+            let addSuccess = false;
+            try {
+                const addRes = await fetch(`https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(siteUrl)}`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${accessToken}` }
+                });
+                if (addRes.ok || addRes.status === 204) {
+                    addSuccess = true;
+                    document.getElementById(`status_${i}`).innerHTML = `<span class="status-badge status-success">Đã Add Thành Công</span>`;
+                } else {
+                    const errObj = await addRes.json();
+                    const errMsg = errObj.error ? errObj.error.message : addRes.statusText;
+                    document.getElementById(`status_${i}`).innerHTML = `<span class="status-badge status-error" title="${errMsg}">Lỗi: ${addRes.status}</span>`;
+                }
+            } catch (err) {
+                document.getElementById(`status_${i}`).innerHTML = `<span class="status-badge status-error" title="${err.message}">Lỗi Mạng</span>`;
+            }
+
+            // 2. NẾU ADD THÀNH CÔNG, GỌI API LẤY MÃ HTML (SiteVerification.getToken)
+            if (addSuccess) {
+                document.getElementById(`meta_${i}`).innerHTML = `<span style="color:var(--warning);font-size:12px;">Đang hút mã HTML...</span>`;
+                
+                try {
+                    const verifyRes = await fetch(`https://www.googleapis.com/siteVerification/v1/token`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            verificationMethod: 'META',
+                            site: { identifier: siteUrl, type: 'SITE' }
+                        })
+                    });
+
+                    if (verifyRes.ok) {
+                        const verifyData = await verifyRes.json();
+                        const metaTag = verifyData.token;
+                        
+                        // Hiển thị khung Code để Copy
+                        document.getElementById(`meta_${i}`).innerHTML = `
+                            <div class="code-box">
+                                <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title='${metaTag.replace(/'/g, "&apos;")}'>${metaTag.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</span>
+                                <button class="btn-copy" onclick="copyToClipboard(this, '${metaTag.replace(/'/g, "\\'")}')">Copy</button>
+                            </div>
+                        `;
+                    } else {
+                        const errObj = await verifyRes.json();
+                        document.getElementById(`meta_${i}`).innerHTML = `<span style="color:var(--danger)">Không lấy được mã (${verifyRes.status})</span>`;
+                    }
+                } catch (err) {
+                    document.getElementById(`meta_${i}`).innerHTML = `<span style="color:var(--danger)">Lỗi hút mã</span>`;
+                }
+            } else {
+                document.getElementById(`meta_${i}`).innerHTML = `<span style="color:var(--text-muted)">- Bỏ qua do lỗi Add -</span>`;
+            }
+
+            // Cập nhật thanh tiến trình
+            progressFill.style.width = `${((i + 1) / domains.length) * 100}%`;
+            
+            // Dừng 0.5s để chống Spam API
+            await new Promise(r => setTimeout(r, 500));
+        }
+
+        // Hoàn tất
+        isRunning = false;
+        btnStart.innerHTML = `🚀 Chạy Lại (Hoàn Tất)`;
+        btnStart.disabled = false;
+        // alert(`Đã xử lý xong ${domains.length} Website!`);
+    }
+
+    function copyToClipboard(btnElement, text) {
+        navigator.clipboard.writeText(text).then(() => {
+            const originalText = btnElement.innerText;
+            btnElement.innerText = "Đã Copy!";
+            btnElement.style.background = "var(--success)";
+            setTimeout(() => {
+                btnElement.innerText = originalText;
+                btnElement.style.background = "rgba(255,255,255,0.1)";
+            }, 2000);
+        });
+    }
+
+    // CSS Keyframe for loading spinner
+    const style = document.createElement('style');
+    style.innerHTML = `
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+    `;
+    document.head.appendChild(style);
+</script>
+
+</body>
+</html>
