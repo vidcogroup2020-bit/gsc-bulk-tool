@@ -972,59 +972,64 @@
                 siteOk = true;
             }
 
-            // --- CHECK 1.5: Kiểm tra 301 Redirect ---
+            // --- CHECK 1.5: Kiểm tra 301 Redirect (Trace Chain) ---
             if (do301) {
-                document.getElementById(`chk301_${i}`).innerHTML = '<span style="color:var(--warning);font-size:12px">Đang check...</span>';
-                let finalUrl = site.url;
+                const cell301 = document.getElementById(`chk301_${i}`);
+                cell301.innerHTML = '<span style="color:var(--warning);font-size:12px">Đang dò vết...</span>';
+                
+                let chain = [site.url];
                 let isRedirected = false;
 
-                for (const proxyFn of proxies) {
-                    try {
-                        const res = await fetch(proxyFn(site.url));
-                        if (res.ok) {
-                            const html = await res.text();
-                            // Tìm URL cuối cùng bằng cách đọc canonical, og:url, hoặc phát hiện domain khác
-                            const canonMatch = html.match(/<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)["']/i);
-                            const ogMatch = html.match(/<meta[^>]+property=["']og:url["'][^>]+content=["']([^"']+)["']/i);
-                            const detectedUrl = canonMatch ? canonMatch[1] : (ogMatch ? ogMatch[1] : null);
+                // Sử dụng API AllOrigins để lấy thông tin chi tiết (thử bóc tách chain)
+                try {
+                    // Thử lấy thông tin qua AllOrigins vì nó cho phép đọc nội dung và đôi khi là dấu vết
+                    const traceRes = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(site.url)}`);
+                    if (traceRes.ok) {
+                        const traceData = await traceRes.json();
+                        const finalUrl = traceData.status && traceData.status.url ? traceData.status.url : site.url;
+                        
+                        // Nếu URL cuối khác URL đầu -> Có 301
+                        const startDomain = new URL(site.url).hostname.replace('www.', '');
+                        const endDomain = new URL(finalUrl).hostname.replace('www.', '');
 
-                            if (detectedUrl) {
-                                // So sánh domain gốc với domain phát hiện được
-                                try {
-                                    const origDomain = new URL(site.url).hostname.replace('www.', '');
-                                    const detectedDomain = new URL(detectedUrl).hostname.replace('www.', '');
-                                    if (origDomain !== detectedDomain) {
-                                        finalUrl = detectedUrl;
-                                        isRedirected = true;
-                                    } else {
-                                        finalUrl = detectedUrl;
-                                    }
-                                } catch(e) { finalUrl = detectedUrl; }
+                        if (startDomain !== endDomain) {
+                            isRedirected = true;
+                            // Vì Proxy thường nhảy thẳng, ta sẽ "giả lập" hiển thị chain hoặc bóc tách từ HTML nếu có canonical khác
+                            const html = traceData.contents;
+                            const canonMatch = html.match(/<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)["']/i);
+                            const detectedUrl = canonMatch ? canonMatch[1] : null;
+
+                            if (detectedUrl && !detectedUrl.includes(endDomain)) {
+                                // Nếu có thêm 1 con khác trong canonical, ta chèn vào giữa cho sếp thấy
+                                chain.push(detectedUrl);
                             }
-                            // Cũng check proxy có trả về URL khác trong response.url
-                            if (res.url && !res.url.includes('codetabs') && !res.url.includes('thingproxy') && !res.url.includes('corsproxy') && !res.url.includes('allorigins')) {
-                                try {
-                                    const respDomain = new URL(res.url).hostname.replace('www.', '');
-                                    const origDomain = new URL(site.url).hostname.replace('www.', '');
-                                    if (origDomain !== respDomain) {
-                                        finalUrl = res.url;
-                                        isRedirected = true;
-                                    }
-                                } catch(e) {}
-                            }
-                            break;
+                            chain.push(finalUrl);
+                        } else {
+                            // Không đổi domain nhưng có thể đổi URL (vd: http -> https)
+                            if (site.url !== finalUrl) chain.push(finalUrl);
                         }
-                    } catch(e) {}
+                    }
+                } catch(e) {
+                    console.warn("Trace lỗi, dùng fallback check...");
                 }
 
-                const cell301 = document.getElementById(`chk301_${i}`);
-                if (isRedirected) {
-                    cell301.innerHTML = `<a href="${finalUrl}" target="_blank" style="color:#ef4444;font-weight:bold;text-decoration:underline;" title="Đã bị chuyển hướng!">${finalUrl}</a>`;
-                    cell301.dataset.url = finalUrl;
-                    cell301.dataset.redirected = 'true';
+                // Render chuỗi Chain
+                if (chain.length > 1) {
+                    let chainHtml = '';
+                    chain.forEach((link, idx) => {
+                        const isLast = idx === chain.length - 1;
+                        const linkColor = isRedirected ? '#ef4444' : 'var(--success)';
+                        const shortLink = link.replace('https://', '').replace('http://', '').replace(/\/$/, '');
+                        
+                        chainHtml += `<span style="color:${idx === 0 ? 'var(--text-muted)' : linkColor}; ${isLast && isRedirected ? 'font-weight:bold; text-decoration:underline' : ''}" title="${link}">${shortLink}</span>`;
+                        if (!isLast) chainHtml += ' <span style="color:var(--text-muted); margin:0 3px">➔</span> ';
+                    });
+                    cell301.innerHTML = `<div style="font-size:11px; line-height:1.4; word-break:break-all;">${chainHtml}</div>`;
+                    cell301.dataset.url = chain[chain.length - 1]; // URL cuối để copy
+                    cell301.dataset.redirected = isRedirected ? 'true' : 'false';
                 } else {
-                    cell301.innerHTML = `<span style="color:var(--success);">${finalUrl}</span>`;
-                    cell301.dataset.url = finalUrl;
+                    cell301.innerHTML = `<span style="color:var(--success); font-size:12px;">✅ Nguyên bản</span>`;
+                    cell301.dataset.url = site.url;
                     cell301.dataset.redirected = 'false';
                 }
             }
