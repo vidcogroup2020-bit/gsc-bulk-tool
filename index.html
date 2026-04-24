@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GSC Bulk Add & Verify Pro</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>" type="image/svg+xml">
     <style>
         :root {
             --bg: #0f172a;
@@ -294,6 +295,45 @@
             accent-color: var(--primary);
             cursor: pointer;
         }
+
+        /* Login Cell */
+        .login-cell {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn-login {
+            padding: 4px 10px;
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s;
+        }
+        .btn-login:hover { background: var(--primary-hover); transform: scale(1.05); }
+        .login-ok {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--success);
+            cursor: pointer;
+        }
+        .btn-filter {
+            margin-top: 12px;
+            padding: 10px 20px;
+            background: var(--danger);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-filter:hover { background: #dc2626; }
     </style>
 </head>
 <body>
@@ -382,7 +422,7 @@
             <div class="check-options">
                 <label><input type="checkbox" id="optWebsite" checked> 🌐 Trạng thái Website</label>
                 <label><input type="checkbox" id="optAdmin" checked> 🔑 Đuôi quản trị (WP-Admin)</label>
-                <label><input type="checkbox" id="optLogin" checked> 🔐 Kiểm tra đăng nhập</label>
+                <label><input type="checkbox" id="optLogin" checked> 🔐 Đăng nhập nhanh</label>
             </div>
             <button id="btnCheck" class="btn btn-success" onclick="startCheck()">🔍 Bắt đầu Kiểm Tra</button>
             <div id="checkProgressBar" class="progress-bar">
@@ -411,6 +451,11 @@
                         </tr>
                     </tbody>
                 </table>
+            </div>
+            <div id="loginFilterBar" style="display:none; margin-top:15px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <button class="btn-filter" onclick="filterFailedLogins()">🔍 Lọc web lỗi đăng nhập</button>
+                <button class="btn" style="margin-top:0; padding:10px 20px;" onclick="showAllRows()">📋 Hiện lại tất cả</button>
+                <span id="filterInfo" style="color:var(--text-muted); font-size:13px;"></span>
             </div>
         </div>
     </div><!-- end tab2 -->
@@ -838,75 +883,17 @@
                 }
             }
 
-            // --- CHECK 3: Đăng nhập WordPress ---
+            // --- CHECK 3: Đăng nhập nhanh (Semi-auto) ---
             if (doLogin && site.user && site.pass) {
-                if (siteOk || isBlocked) {
-                    document.getElementById(`chkLogin_${i}`).innerHTML = '<span style="color:var(--warning);font-size:12px">Đang thử...</span>';
-                    
-                    let loginResult = 'unknown';
-
-                    // PHƯƠNG PHÁP 1: XML-RPC (Ưu tiên vì nhanh và chính xác)
-                    const xmlrpcUrl = site.url + 'xmlrpc.php';
-                    const xmlBody = `<?xml version="1.0"?><methodCall><methodName>wp.getUsersBlogs</methodName><params><param><value><string>${site.user}</string></value></param><param><value><string>${site.pass}</string></value></param></params></methodCall>`;
-                    
-                    for (const proxyFn of proxies) {
-                        try {
-                            const res = await fetch(proxyFn(xmlrpcUrl), {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'text/xml' },
-                                body: xmlBody
-                            });
-                            if (res.ok) {
-                                const xml = await res.text();
-                                if (xml.includes('<name>blogid</name>') || xml.includes('<name>url</name>')) {
-                                    loginResult = 'success'; break;
-                                } else if (xml.includes('faultCode') || xml.includes('Incorrect username') || xml.includes('incorrect_password')) {
-                                    loginResult = 'wrong'; break;
-                                }
-                            }
-                        } catch(e) {}
-                    }
-
-                    // PHƯƠNG PHÁP 2: Form Login (Nếu phương pháp 1 không ra kết quả)
-                    if (loginResult === 'unknown' || loginResult === 'blocked') {
-                        const loginUrl = site.url + 'wp-login.php';
-                        const formData = new URLSearchParams();
-                        formData.append('log', site.user);
-                        formData.append('pwd', site.pass);
-                        formData.append('wp-submit', 'Log In');
-                        formData.append('testcookie', '1');
-
-                        for (const proxyFn of proxies) {
-                            try {
-                                // Một số proxy không hỗ trợ POST Form, ta thử qua Proxy hỗ trợ tốt nhất
-                                const res = await fetch(proxyFn(loginUrl), {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                                    body: formData.toString()
-                                });
-                                
-                                const html = await res.text();
-                                // Nếu thành công, WP thường redirect hoặc trả về trang Dashboard
-                                if (html.includes('wp-admin') && (html.includes('Dashboard') || html.includes('Chào') || html.includes('Howdy'))) {
-                                    loginResult = 'success'; break;
-                                } 
-                                // Nếu sai pass, WP trả về trang login kèm thông báo lỗi
-                                else if (html.includes('error') && (html.includes('password') || html.includes('Mật khẩu') || html.includes('tên người dùng'))) {
-                                    loginResult = 'wrong'; break;
-                                }
-                            } catch(e) {}
-                        }
-                    }
-
-                    if (loginResult === 'success') {
-                        document.getElementById(`chkLogin_${i}`).innerHTML = `<span class="status-badge status-success">✅ ${site.user} đúng</span>`;
-                    } else if (loginResult === 'wrong') {
-                        document.getElementById(`chkLogin_${i}`).innerHTML = '<span class="status-badge status-error">❌ Sai user/pass</span>';
-                    } else {
-                        document.getElementById(`chkLogin_${i}`).innerHTML = '<span class="status-badge" style="background:var(--warning);color:#fff">⚠️ Bị chặn truy cập</span>';
-                    }
-                } else {
-                    document.getElementById(`chkLogin_${i}`).innerHTML = '<span style="color:var(--text-muted)">- Web die -</span>';
+                const loginCell = document.getElementById(`chkLogin_${i}`);
+                if (loginCell) {
+                    const loginUrl = site.url + site.adminPath;
+                    loginCell.innerHTML = `
+                        <div class="login-cell">
+                            <button class="btn-login" onclick="openLogin('${site.url}', '${site.adminPath}', '${site.user}', '${site.pass}')" title="Mở trang login & điền sẵn thông tin">🔑 Đăng nhập</button>
+                            <input type="checkbox" class="login-ok" id="loginOk_${i}" checked title="Bỏ tích nếu không đăng nhập được">
+                            <label for="loginOk_${i}" style="font-size:12px; color:var(--text-muted); cursor:pointer;">Đúng</label>
+                        </div>`;
                 }
             }
 
@@ -914,9 +901,90 @@
             await new Promise(r => setTimeout(r, 1000));
         }
 
+        // Hiện thanh lọc nếu có cột đăng nhập
+        if (doLogin) {
+            document.getElementById('loginFilterBar').style.display = 'flex';
+        }
+
         isChecking = false;
         btn.disabled = false;
         btn.innerHTML = '🔍 Chạy Lại Kiểm Tra';
+    }
+
+    // Mở tab mới và tự động POST form đăng nhập vào wp-login.php
+    function openLogin(baseUrl, adminPath, user, pass) {
+        // Tạo URL login (wp-login.php)
+        let loginPageUrl = baseUrl;
+        if (adminPath === 'wp-admin') {
+            loginPageUrl += 'wp-login.php';
+        } else {
+            // Nếu đuôi admin tùy chỉnh, thử mở đúng đuôi đó
+            loginPageUrl += adminPath;
+        }
+
+        // Tạo một hidden form trong tab mới để tự POST thông tin đăng nhập
+        const newTab = window.open('', '_blank');
+        if (!newTab) {
+            alert('Trình duyệt chặn Popup! Sếp hãy cho phép popup cho trang này.');
+            return;
+        }
+
+        newTab.document.write(`
+            <!DOCTYPE html>
+            <html>
+            <head><title>Đang đăng nhập ${baseUrl}...</title></head>
+            <body style="background:#0f172a;color:#f8fafc;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
+                <div style="text-align:center">
+                    <h2>⏳ Đang đăng nhập vào ${baseUrl}...</h2>
+                    <p style="color:#94a3b8">Tự động chuyển hướng sau 1 giây</p>
+                </div>
+                <form id="autoLoginForm" method="POST" action="${loginPageUrl}">
+                    <input type="hidden" name="log" value="${user}">
+                    <input type="hidden" name="pwd" value="${pass}">
+                    <input type="hidden" name="wp-submit" value="Log In">
+                    <input type="hidden" name="redirect_to" value="${baseUrl}wp-admin/">
+                    <input type="hidden" name="testcookie" value="1">
+                </form>
+                <script>
+                    setTimeout(function() {
+                        document.getElementById('autoLoginForm').submit();
+                    }, 800);
+                <\/script>
+            </body>
+            </html>
+        `);
+        newTab.document.close();
+    }
+
+    // Lọc chỉ hiện những web bị bỏ tích (đăng nhập sai)
+    function filterFailedLogins() {
+        const tbody = document.getElementById('checkResultBody');
+        const rows = tbody.querySelectorAll('tr');
+        let failCount = 0;
+        let totalWithLogin = 0;
+
+        rows.forEach((row, idx) => {
+            const cb = document.getElementById(`loginOk_${idx}`);
+            if (cb) {
+                totalWithLogin++;
+                if (!cb.checked) {
+                    row.style.display = '';
+                    failCount++;
+                } else {
+                    row.style.display = 'none';
+                }
+            }
+        });
+
+        document.getElementById('filterInfo').textContent = `Hiện ${failCount}/${totalWithLogin} web bị lỗi đăng nhập`;
+    }
+
+    // Hiện lại tất cả dòng
+    function showAllRows() {
+        const tbody = document.getElementById('checkResultBody');
+        const rows = tbody.querySelectorAll('tr');
+        rows.forEach(row => row.style.display = '');
+        document.getElementById('filterInfo').textContent = '';
     }
 
     // CSS Keyframe for loading spinner
