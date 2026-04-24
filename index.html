@@ -443,6 +443,7 @@
             </div>
             <div class="check-options">
                 <label><input type="checkbox" id="optWebsite" checked> 🌐 Trạng thái Website</label>
+                <label><input type="checkbox" id="opt301" checked> 🔄 Kiểm tra 301</label>
                 <label><input type="checkbox" id="optAdmin" checked> 🔑 Đuôi quản trị (WP-Admin)</label>
                 <label><input type="checkbox" id="optLogin" checked> 🔐 Đăng nhập nhanh</label>
             </div>
@@ -478,6 +479,10 @@
                 <button class="btn-filter" onclick="filterFailedLogins()">🔍 Lọc web lỗi đăng nhập</button>
                 <button class="btn" style="margin-top:0; padding:10px 20px;" onclick="showAllRows()">📋 Hiện lại tất cả</button>
                 <span id="filterInfo" style="color:var(--text-muted); font-size:13px;"></span>
+            </div>
+            <div id="redirectCopyBar" style="display:none; margin-top:10px;">
+                <button class="btn btn-success" style="padding:10px 20px; font-size:13px; margin:0;" onclick="copyRedirectColumn()">📋 Copy cột URL cuối (để dán vào file)</button>
+                <span id="redirectCopyInfo" style="color:var(--text-muted); font-size:13px; margin-left:10px;"></span>
             </div>
         </div>
     </div><!-- end tab2 -->
@@ -865,10 +870,11 @@
 
         // Đọc trạng thái checkbox
         const doWebsite = document.getElementById('optWebsite').checked;
+        const do301 = document.getElementById('opt301').checked;
         const doAdmin = document.getElementById('optAdmin').checked;
         const doLogin = document.getElementById('optLogin').checked;
 
-        if (!doWebsite && !doAdmin && !doLogin) {
+        if (!doWebsite && !do301 && !doAdmin && !doLogin) {
             alert('Vui lòng chọn ít nhất 1 tiêu chí kiểm tra!');
             return;
         }
@@ -888,6 +894,7 @@
         const thead = tbody.closest('table').querySelector('thead tr');
         thead.innerHTML = '<th>Website URL</th>';
         if (doWebsite) thead.innerHTML += '<th>Trạng thái</th><th>HTTP Code</th>';
+        if (do301) thead.innerHTML += '<th>URL cuối (301)</th>';
         if (doAdmin) thead.innerHTML += '<th>WP-Admin</th>';
         if (doLogin) thead.innerHTML += '<th>Đăng nhập</th>';
         tbody.innerHTML = '';
@@ -910,6 +917,7 @@
             tr.id = `chk_${idx}`;
             let cells = `<td class="domain-cell"><a href="${site.url}" target="_blank" style="color:var(--primary);text-decoration:none">${site.url}</a></td>`;
             if (doWebsite) cells += `<td id="chkStatus_${idx}"><span class="status-badge status-pending">Đang chờ</span></td><td id="chkCode_${idx}" style="color:var(--text-muted)">...</td>`;
+            if (do301) cells += `<td id="chk301_${idx}" style="color:var(--text-muted)">...</td>`;
             if (doAdmin) cells += `<td id="chkAdmin_${idx}" style="color:var(--text-muted)">...</td>`;
             if (doLogin) cells += `<td id="chkLogin_${idx}" style="color:var(--text-muted)">${site.user ? '...' : '<span style="color:var(--text-muted)">- Không có TK -</span>'}</td>`;
             tr.innerHTML = cells;
@@ -964,6 +972,63 @@
                 siteOk = true;
             }
 
+            // --- CHECK 1.5: Kiểm tra 301 Redirect ---
+            if (do301) {
+                document.getElementById(`chk301_${i}`).innerHTML = '<span style="color:var(--warning);font-size:12px">Đang check...</span>';
+                let finalUrl = site.url;
+                let isRedirected = false;
+
+                for (const proxyFn of proxies) {
+                    try {
+                        const res = await fetch(proxyFn(site.url));
+                        if (res.ok) {
+                            const html = await res.text();
+                            // Tìm URL cuối cùng bằng cách đọc canonical, og:url, hoặc phát hiện domain khác
+                            const canonMatch = html.match(/<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)["']/i);
+                            const ogMatch = html.match(/<meta[^>]+property=["']og:url["'][^>]+content=["']([^"']+)["']/i);
+                            const detectedUrl = canonMatch ? canonMatch[1] : (ogMatch ? ogMatch[1] : null);
+
+                            if (detectedUrl) {
+                                // So sánh domain gốc với domain phát hiện được
+                                try {
+                                    const origDomain = new URL(site.url).hostname.replace('www.', '');
+                                    const detectedDomain = new URL(detectedUrl).hostname.replace('www.', '');
+                                    if (origDomain !== detectedDomain) {
+                                        finalUrl = detectedUrl;
+                                        isRedirected = true;
+                                    } else {
+                                        finalUrl = detectedUrl;
+                                    }
+                                } catch(e) { finalUrl = detectedUrl; }
+                            }
+                            // Cũng check proxy có trả về URL khác trong response.url
+                            if (res.url && !res.url.includes('codetabs') && !res.url.includes('thingproxy') && !res.url.includes('corsproxy') && !res.url.includes('allorigins')) {
+                                try {
+                                    const respDomain = new URL(res.url).hostname.replace('www.', '');
+                                    const origDomain = new URL(site.url).hostname.replace('www.', '');
+                                    if (origDomain !== respDomain) {
+                                        finalUrl = res.url;
+                                        isRedirected = true;
+                                    }
+                                } catch(e) {}
+                            }
+                            break;
+                        }
+                    } catch(e) {}
+                }
+
+                const cell301 = document.getElementById(`chk301_${i}`);
+                if (isRedirected) {
+                    cell301.innerHTML = `<a href="${finalUrl}" target="_blank" style="color:#ef4444;font-weight:bold;text-decoration:underline;" title="Đã bị chuyển hướng!">${finalUrl}</a>`;
+                    cell301.dataset.url = finalUrl;
+                    cell301.dataset.redirected = 'true';
+                } else {
+                    cell301.innerHTML = `<span style="color:var(--success);">${finalUrl}</span>`;
+                    cell301.dataset.url = finalUrl;
+                    cell301.dataset.redirected = 'false';
+                }
+            }
+
             // --- CHECK 2: WP-Admin ---
             if (doAdmin) {
                 if (siteOk || isBlocked) {
@@ -1015,6 +1080,10 @@
         // Hiện thanh lọc nếu có cột đăng nhập
         if (doLogin) {
             document.getElementById('loginFilterBar').style.display = 'flex';
+        }
+        // Hiện nút copy cột URL cuối nếu có check 301
+        if (do301) {
+            document.getElementById('redirectCopyBar').style.display = 'block';
         }
 
         isChecking = false;
@@ -1109,6 +1178,25 @@
         const rows = tbody.querySelectorAll('tr');
         rows.forEach(row => row.style.display = '');
         document.getElementById('filterInfo').textContent = '';
+    }
+
+    // Copy toàn bộ cột URL cuối (301)
+    function copyRedirectColumn() {
+        const cells = document.querySelectorAll('[id^="chk301_"]');
+        let urls = [];
+        let redirectCount = 0;
+
+        cells.forEach(cell => {
+            const url = cell.dataset.url || '';
+            if (url) urls.push(url);
+            if (cell.dataset.redirected === 'true') redirectCount++;
+        });
+
+        const text = urls.join('\n');
+        navigator.clipboard.writeText(text).then(() => {
+            document.getElementById('redirectCopyInfo').textContent = `✅ Đã copy ${urls.length} URL (${redirectCount} bị 301)`;
+            document.getElementById('redirectCopyInfo').style.color = 'var(--success)';
+        });
     }
 
     // CSS Keyframe for loading spinner
