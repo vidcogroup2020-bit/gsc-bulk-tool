@@ -198,13 +198,20 @@
             padding: 8px 10px;
             border-radius: 6px;
             font-family: monospace;
-            font-size: 12px;
+            font-size: 11px;
             color: #a78bfa;
             border: 1px solid #4c1d95;
             display: flex;
             justify-content: space-between;
             align-items: center;
             gap: 10px;
+            max-width: 350px; /* Thu gọn chiều rộng */
+        }
+        .code-text {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis; /* Hiện dấu ... nếu quá dài */
+            flex-grow: 1;
         }
 
         .btn-copy {
@@ -816,7 +823,10 @@
                 const errData = await res.json();
                 const errMsg = errData.error ? errData.error.message : 'Unknown error';
                 
-                if (errMsg.includes('not found') || errMsg.includes('verify')) {
+                if (res.status === 401) {
+                    verifyCell.innerHTML = `<span class="status-badge status-error" title="Token hết hạn">❌ Đăng nhập lại</span>`;
+                    alert("⚠️ Phiên đăng nhập Google đã hết hạn. Sếp vui lòng bấm F5 và đăng nhập lại để tiếp tục xác minh nhé!");
+                } else if (errMsg.includes('not found') || errMsg.includes('verify')) {
                     verifyCell.innerHTML = `<span class="status-badge status-error" title="${errMsg}">❌ Chưa dán mã</span>`;
                 } else {
                     verifyCell.innerHTML = `<span class="status-badge status-error" title="${errMsg}">❌ Lỗi: ${res.status}</span>`;
